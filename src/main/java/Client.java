@@ -1,4 +1,3 @@
-import app.TransferApp;
 import config.AppConfig;
 import utils.cli.ClientCommandLineParser;
 import utils.cli.CommandLineParser;
@@ -12,7 +11,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Scanner;
 
-public class Client implements TransferApp {
+public class Client {
     AppConfig appConfig;
 
     public static void main(String args[]) {
