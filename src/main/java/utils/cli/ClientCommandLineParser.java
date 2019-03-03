@@ -15,6 +15,10 @@ public class ClientCommandLineParser implements CommandLineParser {
         ip.setRequired(true);
         options.addOption(ip);
 
+        Option url = new Option("url", "use-url", false, "IP address is in URL format");
+        url.setRequired(false);
+        options.addOption(url);
+
         Option file = new Option("f", "filename", true,  "file to transfer");
         file.setRequired(true);
         options.addOption(file);
@@ -49,6 +53,9 @@ public class ClientCommandLineParser implements CommandLineParser {
             }
             if(cmd.hasOption("stream")) {
                 config.setUseStreaming(true);
+            }
+            if(cmd.hasOption("url")) {
+                config.setUseUrl(true);
             }
         }
         catch (ParseException exception) {

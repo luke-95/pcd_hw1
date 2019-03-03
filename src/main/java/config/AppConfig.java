@@ -8,6 +8,7 @@ public class AppConfig {
     private String ip;
     private boolean useUDP;
     private boolean useStreaming;
+    private boolean useUrl;
 
     public AppConfig() {
         useUDP = true;
@@ -63,4 +64,11 @@ public class AppConfig {
         this.useStreaming = useStreaming;
     }
 
+    public boolean getUseUrl() {
+        return useUrl;
+    }
+
+    public void setUseUrl(boolean useUrl) {
+        this.useUrl = useUrl;
+    }
 }

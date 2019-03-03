@@ -1,6 +1,7 @@
 import config.AppConfig;
 import utils.cli.ClientCommandLineParser;
 import utils.cli.CommandLineParser;
+import utils.cli.ServerCommandLineParser;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -14,7 +15,7 @@ import java.net.UnknownHostException;
 public class Server {
 
     public static void main(String args[]) throws Exception {
-        CommandLineParser cliParser = new ClientCommandLineParser();
+        CommandLineParser cliParser = new ServerCommandLineParser();
         AppConfig appConfig = new AppConfig();
         cliParser.parseCliArguments(args, appConfig);
 
@@ -33,17 +34,21 @@ public class Server {
 
         try {
             ServerSocket serverSocket = new ServerSocket(appConfig.getPort());
+            System.out.println(String.format("Server waiting at port: %d", serverSocket.getLocalPort()));
+
             Socket ss_accept = serverSocket.accept();
             BufferedReader ss_bufferedReader = new BufferedReader(new InputStreamReader(ss_accept.getInputStream()));
             PrintStream printStream = new PrintStream(ss_accept.getOutputStream());
 
             while (receivedMessage.compareTo(exitMessage) != 0) {
+                Thread.sleep(1000);
                 receivedMessage = ss_bufferedReader.readLine();
                 if (receivedMessage.compareTo(exitMessage) == 0) {
                     break;
                 }
 
                 System.out.println("Frame #" + receivedMessage +" was received");
+                Thread.sleep(500);
                 printStream.println("Received");
             }
         } catch (SocketException socketException) {
@@ -52,6 +57,8 @@ public class Server {
             unknownHostException.printStackTrace();
         } catch (IOException ioException) {
             ioException.printStackTrace();
+        } catch (InterruptedException interruptedException) {
+            interruptedException.printStackTrace();
         }
 
         System.out.println("ALL FRAMES WERE RECEIVED SUCCESSFULLY");

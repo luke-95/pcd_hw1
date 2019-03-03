@@ -6,9 +6,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.UnknownHostException;
+import java.net.*;
 import java.util.Scanner;
 
 public class Client {
@@ -21,7 +19,6 @@ public class Client {
 
         Client client = new Client(appConfig);
         client.run();
-        System.out.println("Hello World");
     }
 
     Client(AppConfig config) {
@@ -39,7 +36,15 @@ public class Client {
         }
 
         int framesCount = scanner.nextInt();
+
         try {
+            if (appConfig.getUseUrl()) {
+                // Convert URL to IP
+                InetAddress address = InetAddress.getByName(new URL(appConfig.getIp()).getHost());
+                appConfig.setIp(address.getHostAddress());
+            }
+
+            // Start socket
             Socket socket = new Socket(appConfig.getIp(), appConfig.getPort());
             PrintStream printStream = new PrintStream(socket.getOutputStream());
 
@@ -56,6 +61,8 @@ public class Client {
                 if (ack != null) {
                     System.out.println("Acknowledgement was Received from receiver");
                     currentFrameIndex++;
+                    Thread.sleep(2000);
+
                 } else {
                     printStream.println(currentFrameIndex);
                 }
@@ -66,6 +73,8 @@ public class Client {
             unknownHostException.printStackTrace();
         } catch (IOException ioException) {
             ioException.printStackTrace();
+        } catch (InterruptedException interruptedException) {
+            interruptedException.printStackTrace();
         }
     }
 
