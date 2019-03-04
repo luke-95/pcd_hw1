@@ -12,26 +12,26 @@ class StopWaitSender {
     }
 
     public void run() throws Exception {
-        Scanner sc = new Scanner(System.in);
+        Scanner scanner = new Scanner(System.in);
         System.out.println("Enter no of frames to be sent:");
-        int n = sc.nextInt();
-        Socket myskt = new Socket("localhost", 9999);
-        PrintStream myps = new PrintStream(myskt.getOutputStream());
-        for (int i = 0; i <= n; ) {
-            if (i == n) {
-                myps.println("exit");
+        int totalFrameCount = scanner.nextInt();
+        Socket socket = new Socket("localhost", 9999);
+        PrintStream printStream = new PrintStream(socket.getOutputStream());
+        for (int currentFrameIndex = 0; currentFrameIndex <= totalFrameCount; ) {
+            if (currentFrameIndex >= totalFrameCount) {
+                printStream.println("exit");
                 break;
             }
-            System.out.println("Frame #" + i +" is sent");
-            myps.println(i);
-            BufferedReader bf = new BufferedReader(new InputStreamReader(myskt.getInputStream()));
+            System.out.println("Frame #" + currentFrameIndex +" is sent");
+            printStream.println(currentFrameIndex);
+            BufferedReader bf = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             String ack = bf.readLine();
             if (ack != null) {
                 System.out.println("Acknowledgement was Received from receiver");
-                i++;
+                currentFrameIndex++;
                 Thread.sleep(4000);
             } else {
-                myps.println(i);
+                printStream.println(currentFrameIndex);
             }
         }
     }

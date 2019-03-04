@@ -1,16 +1,10 @@
 import config.AppConfig;
-import utils.cli.ClientCommandLineParser;
 import utils.cli.CommandLineParser;
 import utils.cli.ServerCommandLineParser;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 
 public class Server {
 
@@ -25,7 +19,7 @@ public class Server {
 
     AppConfig appConfig;
 
-    Server(AppConfig config) {
+    public Server(AppConfig config) {
         this.appConfig = config;
     }
 
@@ -43,39 +37,96 @@ public class Server {
     }
 
     public void receiveWithTcp() {
-        String receivedMessage ="not_exit", exitMessage ="exit";
+
 
         try {
-            ServerSocket serverSocket = new ServerSocket(appConfig.getPort());
-            System.out.println(String.format("Server waiting at port: %d", serverSocket.getLocalPort()));
+            ServerSocket serverSocket = null;
+            serverSocket = new ServerSocket(appConfig.getPort());
+            System.out.println(String.format("Waiting at port: %d", serverSocket.getLocalPort()));
 
-            Socket ss_accept = serverSocket.accept();
+            while(true) {
+                // Wait for new connection
+                Socket clientSocket = null;
+                clientSocket = serverSocket.accept();
+                System.out.println(String.format("Client connected: %s:%d", clientSocket.getLocalAddress(), clientSocket.getLocalPort()));
 
-            System.out.println(String.format("Connected to: %s", ss_accept.getLocalAddress()));
-            BufferedReader ss_bufferedReader = new BufferedReader(new InputStreamReader(ss_accept.getInputStream()));
-            PrintStream printStream = new PrintStream(ss_accept.getOutputStream());
+                // Receive Chunk size
+                appConfig.setChunkSize(receiveInt(clientSocket));
+                System.out.println(String.format("Chunk size: %d", appConfig.getChunkSize()));
 
-            while (receivedMessage.compareTo(exitMessage) != 0) {
-                Thread.sleep(1000);
-                receivedMessage = ss_bufferedReader.readLine();
-                if (receivedMessage.compareTo(exitMessage) == 0) {
-                    break;
+                System.out.println("Starting file transfer...");
+                if (appConfig.getUseStreaming()) {
+                    receiveWithStreaming(clientSocket);
+                } else {
+                    receiveWithStopAndWait(clientSocket);
                 }
-
-                System.out.println("Frame #" + receivedMessage +" was received");
-                Thread.sleep(500);
-                printStream.println("Received");
+                System.out.println("Transfer complete.");
             }
-        } catch (SocketException socketException) {
-            socketException.printStackTrace();
-        } catch (UnknownHostException unknownHostException) {
-            unknownHostException.printStackTrace();
+        } catch (FileNotFoundException fileNotFoundException){
+            fileNotFoundException.printStackTrace();
         } catch (IOException ioException) {
             ioException.printStackTrace();
-        } catch (InterruptedException interruptedException) {
-            interruptedException.printStackTrace();
         }
+    }
 
-        System.out.println("ALL FRAMES WERE RECEIVED SUCCESSFULLY");
+    private void receiveWithStopAndWait(Socket clientSocket) throws IOException {
+        int bytesReceived;
+        int frameCount = 0;
+        byte[] buffer = new byte[appConfig.getChunkSize()];
+
+        // Open the remote socket's input stream
+        InputStream clientInputStream = clientSocket.getInputStream();
+
+        // Open a local output stream, to write the received file
+        OutputStream localFileOutputStream = new FileOutputStream("test_output.txt");
+
+        // Receive chunks
+        while ((bytesReceived = clientInputStream.read(buffer)) != -1) {
+            // Write received chunk to file
+            localFileOutputStream.write(buffer, 0, bytesReceived);
+            System.out.println(String.format("Received chunk: %d", frameCount));
+
+            // Reply with ACK message
+            sendInt(clientSocket, Client.ACK_OK);
+            System.out.println(String.format("Sent ACK for chunk: %d", frameCount));
+
+            frameCount += 1;
+        }
+        // Close the FileOutputStream handle
+        localFileOutputStream.close();
+    }
+
+    private void receiveWithStreaming(Socket clientSocket) throws IOException {
+        int bytesRead;
+        // File transfer
+        InputStream clientInputStream = clientSocket.getInputStream();
+        OutputStream localFileOutputStream = new FileOutputStream("test_output.txt");
+        byte[] buffer = new byte[appConfig.getChunkSize()];
+        while ((bytesRead = clientInputStream.read(buffer)) != -1) {
+            localFileOutputStream.write(buffer, 0, bytesRead);
+        }
+        // Closing the FileOutputStream handle
+        localFileOutputStream.close();
+    }
+
+    private void sendInt(Socket serverSocket, int value)
+    {
+        try {
+            DataOutputStream dataOutputStream = new DataOutputStream(serverSocket.getOutputStream());
+            dataOutputStream.writeInt(value);
+        } catch (IOException ioException) {
+            ioException.printStackTrace();
+        }
+    }
+
+    private int receiveInt(Socket clientSocket) {
+        int value = -1;
+        try {
+            DataInputStream dataInputStream = new DataInputStream(clientSocket.getInputStream());
+            value = dataInputStream.readInt();
+        } catch (IOException ioException) {
+            ioException.printStackTrace();
+        }
+        return value;
     }
 }

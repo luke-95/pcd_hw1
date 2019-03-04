@@ -2,15 +2,12 @@ import config.AppConfig;
 import utils.cli.ClientCommandLineParser;
 import utils.cli.CommandLineParser;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.*;
-import java.util.Scanner;
 
 public class Client {
-    AppConfig appConfig;
+    public static int ACK_OK = 100;
+    private AppConfig appConfig;
 
     public static void main(String args[]) {
         CommandLineParser cliParser = new ClientCommandLineParser();
@@ -21,7 +18,7 @@ public class Client {
         client.run();
     }
 
-    Client(AppConfig config) {
+    public Client(AppConfig config) {
         this.appConfig = config;
     }
 
@@ -32,7 +29,6 @@ public class Client {
         } else {
             sendWithTcp();
         }
-
     }
 
 
@@ -43,54 +39,100 @@ public class Client {
 
     public void sendWithTcp()
     {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("Enter no of frames to be sent:");
-
-
-
-        int framesCount = scanner.nextInt();
-
         try {
-            if (appConfig.getUseUrl()) {
-                // Convert URL to IP
-                InetAddress address = InetAddress.getByName(new URL(appConfig.getIp()).getHost());
-                appConfig.setIp(address.getHostAddress());
-            }
-
-            // Start socket
-            System.out.println(String.format("Will connect to %s:%d", appConfig.getIp(), appConfig.getPort()));
-            Socket socket = new Socket(InetAddress.getByName(new URL(appConfig.getIp()).getHost()), appConfig.getPort());
+            // Open Server Socket
+            System.out.println(String.format("Connecting to: %s:%d", appConfig.getIp(), appConfig.getPort()));
+            Socket serverSocket = new Socket(appConfig.getIp(), appConfig.getPort());
             System.out.println("Connected");
 
-            PrintStream printStream = new PrintStream(socket.getOutputStream());
+            // Send chunk size
+            sendInt(serverSocket, appConfig.getChunkSize());
 
-            for (int currentFrameIndex = 0; currentFrameIndex <= framesCount; ) {
-                if (currentFrameIndex == framesCount) {
-                    printStream.println("exit");
-                    break;
-                }
-                System.out.println("Frame #" + currentFrameIndex +" is sent");
-                printStream.println(currentFrameIndex);
+            // Open file
+            File file = new File(appConfig.getFilename());
 
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                String ack = bufferedReader.readLine();
-                if (ack != null) {
-                    System.out.println("Acknowledgement was Received from receiver");
-                    currentFrameIndex++;
-                    Thread.sleep(2000);
+            System.out.println(String.format("Will send: %s", appConfig.getFilename()));
+            System.out.println(String.format("File size: %d", file.length()));
+            System.out.println(String.format("Chunk size: %d", appConfig.getChunkSize()));
 
-                } else {
-                    printStream.println(currentFrameIndex);
-                }
+
+            System.out.println("Starting file transfer...");
+            if (appConfig.getUseStreaming()) {
+                sendWithStreaming(serverSocket, file);
+            } else {
+                sendWithStopWait(serverSocket, file);
             }
-        } catch (SocketException socketException) {
-            socketException.printStackTrace();
-        } catch (UnknownHostException unknownHostException) {
-            unknownHostException.printStackTrace();
+            System.out.println("File transfer complete.");
+            serverSocket.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private void sendWithStopWait(Socket serverSocket, File file) throws IOException
+    {
+        double chunk_count = Math.ceil(file.length() / appConfig.getChunkSize());
+        // Read file
+        byte[] fileDataByteArray = new byte[(int) file.length()];
+        FileInputStream fileInputStream = new FileInputStream(file);
+        BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
+        OutputStream serverOutputStream = serverSocket.getOutputStream();
+
+        // Send file chunk by chunk
+        for (int chunkIndex = 0; chunkIndex < chunk_count; ++chunkIndex) {
+            // Read chunk from file
+            bufferedInputStream.read(fileDataByteArray, 0, appConfig.getChunkSize());
+
+            // Send chunk
+            System.out.println("Sending chunk: " + chunkIndex);
+            serverOutputStream.write(fileDataByteArray, 0, appConfig.getChunkSize());
+
+            // Check ACK
+            if (receiveInt(serverSocket) != ACK_OK) {
+                // Received bad chunk index -> resend chunk
+                System.out.println(String.format("Failed to receive ACK for chunk: %d", chunkIndex));
+                chunkIndex -= 1;
+            } else {
+                System.out.println(String.format("Received ACK for chunk: %d", chunkIndex));
+            }
+        }
+        serverOutputStream.flush();
+    }
+
+
+    private void sendWithStreaming(Socket serverSocket, File file) throws IOException {
+        // Read file
+        byte[] fileDataByteArray = new byte[(int) file.length()];
+        FileInputStream fileInputStream = new FileInputStream(file);
+        BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
+        bufferedInputStream.read(fileDataByteArray, 0, fileDataByteArray.length);
+
+        // Stream whole file
+        OutputStream serverOutputStream = serverSocket.getOutputStream();
+        serverOutputStream.write(fileDataByteArray, 0, fileDataByteArray.length);
+        serverOutputStream.flush();
+    }
+
+    private void sendInt(Socket serverSocket, int value)
+    {
+        try {
+            DataOutputStream dataOutputStream = new DataOutputStream(serverSocket.getOutputStream());
+            dataOutputStream.writeInt(value);
         } catch (IOException ioException) {
             ioException.printStackTrace();
-        } catch (InterruptedException interruptedException) {
-            interruptedException.printStackTrace();
         }
+    }
+
+    private int receiveInt(Socket clientSocket) {
+        int value = -1;
+        try {
+            DataInputStream dataInputStream = new DataInputStream(clientSocket.getInputStream());
+            value = dataInputStream.readInt();
+        } catch (IOException ioException) {
+            ioException.printStackTrace();
+        }
+        return value;
     }
 }

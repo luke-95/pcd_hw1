@@ -15,7 +15,7 @@ public class ServerCommandLineParser implements CommandLineParser{
         protocol.setRequired(false);
         options.addOption(protocol);
 
-        Option stopAndWait = new Option("stream", "stream", false,  "Set this flag to set the transfer mode to streaming. Default: stop and wait");
+        Option stopAndWait = new Option("stream", "streaming", false,  "Set this flag to set the transfer mode to streaming. Default: stop and wait");
         stopAndWait.setRequired(false);
         options.addOption(stopAndWait);
 

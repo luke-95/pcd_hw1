@@ -13,7 +13,8 @@ public class AppConfig {
     public AppConfig() {
         useUDP = true;
         useStreaming = false;
-        port = 80;
+        port = 3443;
+        chunkSize = 1024;
     }
 
     public int getChunkSize() {
