@@ -30,6 +30,19 @@ public class Server {
     }
 
     public void run() {
+        if (appConfig.getUseUDP())
+        {
+            receiveWithUdp();
+        } else {
+            receiveWithTcp();
+        }
+    }
+
+    public void receiveWithUdp() {
+
+    }
+
+    public void receiveWithTcp() {
         String receivedMessage ="not_exit", exitMessage ="exit";
 
         try {
@@ -37,6 +50,8 @@ public class Server {
             System.out.println(String.format("Server waiting at port: %d", serverSocket.getLocalPort()));
 
             Socket ss_accept = serverSocket.accept();
+
+            System.out.println(String.format("Connected to: %s", ss_accept.getLocalAddress()));
             BufferedReader ss_bufferedReader = new BufferedReader(new InputStreamReader(ss_accept.getInputStream()));
             PrintStream printStream = new PrintStream(ss_accept.getOutputStream());
 
@@ -62,9 +77,5 @@ public class Server {
         }
 
         System.out.println("ALL FRAMES WERE RECEIVED SUCCESSFULLY");
-    }
-
-    public void doNothing() {
-
     }
 }

@@ -27,13 +27,26 @@ public class Client {
 
     public void run()
     {
+        if (appConfig.getUseUDP()) {
+            sendWithUdp();
+        } else {
+            sendWithTcp();
+        }
 
+    }
+
+
+    public void sendWithUdp()
+    {
+
+    }
+
+    public void sendWithTcp()
+    {
         Scanner scanner = new Scanner(System.in);
         System.out.println("Enter no of frames to be sent:");
 
-        if (appConfig.getUseUDP()) {
 
-        }
 
         int framesCount = scanner.nextInt();
 
@@ -45,7 +58,10 @@ public class Client {
             }
 
             // Start socket
-            Socket socket = new Socket(appConfig.getIp(), appConfig.getPort());
+            System.out.println(String.format("Will connect to %s:%d", appConfig.getIp(), appConfig.getPort()));
+            Socket socket = new Socket(InetAddress.getByName(new URL(appConfig.getIp()).getHost()), appConfig.getPort());
+            System.out.println("Connected");
+
             PrintStream printStream = new PrintStream(socket.getOutputStream());
 
             for (int currentFrameIndex = 0; currentFrameIndex <= framesCount; ) {
@@ -76,9 +92,5 @@ public class Client {
         } catch (InterruptedException interruptedException) {
             interruptedException.printStackTrace();
         }
-    }
-
-    public void doNothing() {
-
     }
 }
