@@ -43,6 +43,7 @@ public class Client {
             // Open Server Socket
             System.out.println(String.format("Connecting to: %s:%d", appConfig.getIp(), appConfig.getPort()));
             Socket serverSocket = new Socket(appConfig.getIp(), appConfig.getPort());
+            serverSocket.setSoTimeout(1000);
             System.out.println("Connected");
 
             // Send chunk size
@@ -74,31 +75,65 @@ public class Client {
     private void sendWithStopWait(Socket serverSocket, File file) throws IOException
     {
         double chunk_count = Math.ceil(file.length() / appConfig.getChunkSize());
+        int byteOffset = 0;
+        int chunkIndex;
+
         // Read file
         byte[] fileDataByteArray = new byte[(int) file.length()];
         FileInputStream fileInputStream = new FileInputStream(file);
         BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
-        OutputStream serverOutputStream = serverSocket.getOutputStream();
+        bufferedInputStream.read(fileDataByteArray, 0, (int)file.length());
 
         // Send file chunk by chunk
-        for (int chunkIndex = 0; chunkIndex < chunk_count; ++chunkIndex) {
+        OutputStream serverOutputStream = serverSocket.getOutputStream();
+        for (chunkIndex = 0; chunkIndex < chunk_count; ++chunkIndex) {
             // Read chunk from file
-            bufferedInputStream.read(fileDataByteArray, 0, appConfig.getChunkSize());
+            byteOffset = chunkIndex * appConfig.getChunkSize();
 
             // Send chunk
             System.out.println("Sending chunk: " + chunkIndex);
-            serverOutputStream.write(fileDataByteArray, 0, appConfig.getChunkSize());
+            serverOutputStream.write(fileDataByteArray, byteOffset, appConfig.getChunkSize());
 
-            // Check ACK
-            if (receiveInt(serverSocket) != ACK_OK) {
-                // Received bad chunk index -> resend chunk
-                System.out.println(String.format("Failed to receive ACK for chunk: %d", chunkIndex));
-                chunkIndex -= 1;
-            } else {
-                System.out.println(String.format("Received ACK for chunk: %d", chunkIndex));
+            if (!appConfig.getUseStreaming()) {
+                // Check ACK
+                try {
+                    if (receiveInt(serverSocket) != ACK_OK) {
+                        // Received bad ACK message -> resend chunk
+                        System.out.println(String.format("Received malformed ACK for chunk: %d", chunkIndex));
+                        chunkIndex -= 1;
+                    } else {
+                        System.out.println(String.format("Received ACK for chunk: %d", chunkIndex));
+                    }
+                } catch (SocketTimeoutException e) {
+                    // ACK timed out -> resend chunk
+                    System.out.println(String.format("Failed to receive ACK for chunk: %d", chunkIndex));
+                    chunkIndex -= 1;
+                }
             }
         }
-        serverOutputStream.flush();
+
+        // Send any leftover chunks
+        boolean complete = false;
+        while (!complete) {
+            byteOffset += appConfig.getChunkSize();
+            serverOutputStream.write(fileDataByteArray, byteOffset, (int)(file.length() - byteOffset));
+
+            // Check ACK
+            try {
+                if (receiveInt(serverSocket) != ACK_OK) {
+                    // Received bad ACK message -> resend chunk
+                    System.out.println(String.format("Received malformed ACK for chunk: %d", chunkIndex));
+                    complete = false;
+                } else {
+                    System.out.println(String.format("Received ACK for chunk: %d", chunkIndex));
+                }
+            } catch (SocketTimeoutException e) {
+                // ACK timed out -> resend chunk
+                System.out.println(String.format("Failed to receive ACK for chunk: %d", chunkIndex));
+                complete = false;
+            }
+        }
+
     }
 
 
@@ -125,14 +160,10 @@ public class Client {
         }
     }
 
-    private int receiveInt(Socket clientSocket) {
-        int value = -1;
-        try {
-            DataInputStream dataInputStream = new DataInputStream(clientSocket.getInputStream());
-            value = dataInputStream.readInt();
-        } catch (IOException ioException) {
-            ioException.printStackTrace();
-        }
+    private int receiveInt(Socket clientSocket) throws IOException, SocketTimeoutException {
+        int value;
+        DataInputStream dataInputStream = new DataInputStream(clientSocket.getInputStream());
+        value = dataInputStream.readInt();
         return value;
     }
 }

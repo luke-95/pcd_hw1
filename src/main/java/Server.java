@@ -5,6 +5,7 @@ import utils.cli.ServerCommandLineParser;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Server {
 
@@ -48,6 +49,7 @@ public class Server {
                 // Wait for new connection
                 Socket clientSocket = null;
                 clientSocket = serverSocket.accept();
+                clientSocket.setSoTimeout(2000);
                 System.out.println(String.format("Client connected: %s:%d", clientSocket.getLocalAddress(), clientSocket.getLocalPort()));
 
                 // Receive Chunk size
@@ -82,15 +84,23 @@ public class Server {
 
         // Receive chunks
         while ((bytesReceived = clientInputStream.read(buffer)) != -1) {
-            // Write received chunk to file
-            localFileOutputStream.write(buffer, 0, bytesReceived);
-            System.out.println(String.format("Received chunk: %d", frameCount));
 
-            // Reply with ACK message
-            sendInt(clientSocket, Client.ACK_OK);
-            System.out.println(String.format("Sent ACK for chunk: %d", frameCount));
+            int randomNum = ThreadLocalRandom.current().nextInt(1, 20 + 1);
+            if (randomNum == 1) {
+                // 1 in 20 chance to miss a reply.
+                // Ignore the buffer's contents
+            } else {
+                // Write received chunk to file
+                localFileOutputStream.write(buffer, 0, bytesReceived);
+                System.out.println(String.format("Received chunk: %d", frameCount));
 
-            frameCount += 1;
+                // Reply with ACK message
+                sendInt(clientSocket, Client.ACK_OK);
+                System.out.println(String.format("Sent ACK for chunk: %d", frameCount));
+
+                frameCount += 1;
+            }
+
         }
         // Close the FileOutputStream handle
         localFileOutputStream.close();
