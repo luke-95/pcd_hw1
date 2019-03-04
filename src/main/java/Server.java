@@ -38,8 +38,6 @@ public class Server {
     }
 
     public void receiveWithTcp() {
-
-
         try {
             ServerSocket serverSocket = null;
             serverSocket = new ServerSocket(appConfig.getPort());
@@ -52,16 +50,13 @@ public class Server {
                 clientSocket.setSoTimeout(2000);
                 System.out.println(String.format("Client connected: %s:%d", clientSocket.getLocalAddress(), clientSocket.getLocalPort()));
 
-                // Receive Chunk size
+                // Receive ChunkSize message
                 appConfig.setChunkSize(receiveInt(clientSocket));
                 System.out.println(String.format("Chunk size: %d", appConfig.getChunkSize()));
 
+                // Receive the file
                 System.out.println("Starting file transfer...");
-                if (appConfig.getUseStreaming()) {
-                    receiveWithStreaming(clientSocket);
-                } else {
-                    receiveWithStopAndWait(clientSocket);
-                }
+                handleTransferOverTcp(clientSocket);
                 System.out.println("Transfer complete.");
             }
         } catch (FileNotFoundException fileNotFoundException){
@@ -71,9 +66,9 @@ public class Server {
         }
     }
 
-    private void receiveWithStopAndWait(Socket clientSocket) throws IOException {
+    private void handleTransferOverTcp(Socket clientSocket) throws IOException {
         int bytesReceived;
-        int frameCount = 0;
+        int receivedFramesCount = 0;
         byte[] buffer = new byte[appConfig.getChunkSize()];
 
         // Open the remote socket's input stream
@@ -85,22 +80,30 @@ public class Server {
         // Receive chunks
         while ((bytesReceived = clientInputStream.read(buffer)) != -1) {
 
-            int randomNum = ThreadLocalRandom.current().nextInt(1, 20 + 1);
-            if (randomNum == 1) {
-                // 1 in 20 chance to miss a reply.
-                // Ignore the buffer's contents
-            } else {
-                // Write received chunk to file
+            if (appConfig.getUseStreaming())
+            {
+                // -- Streaming implementation --
                 localFileOutputStream.write(buffer, 0, bytesReceived);
-                System.out.println(String.format("Received chunk: %d", frameCount));
-
-                // Reply with ACK message
-                sendInt(clientSocket, Client.ACK_OK);
-                System.out.println(String.format("Sent ACK for chunk: %d", frameCount));
-
-                frameCount += 1;
+                System.out.println(String.format("Received chunk: %d", receivedFramesCount));
             }
+            else
+            {
+                // -- Stop and Wait implementation --
+                // Random for a 1 in 100 chance to "miss" (ignore) a reply.
+                int randomNum = ThreadLocalRandom.current().nextInt(1, 100 + 1);
+                if (randomNum == 50) {
+                    // Ignore the received chunk
+                } else {
+                    // Write received chunk to file
+                    localFileOutputStream.write(buffer, 0, bytesReceived);
+                    System.out.println(String.format("Received chunk: %d", receivedFramesCount));
 
+                    // Reply with ACK message
+                    sendInt(clientSocket, Client.ACK_OK);
+                    System.out.println(String.format("Sent ACK for chunk: %d", receivedFramesCount));
+                }
+                receivedFramesCount += 1;
+            }
         }
         // Close the FileOutputStream handle
         localFileOutputStream.close();
