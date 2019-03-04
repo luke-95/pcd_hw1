@@ -3,8 +3,7 @@ import utils.cli.CommandLineParser;
 import utils.cli.ServerCommandLineParser;
 
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class Server {
@@ -34,10 +33,61 @@ public class Server {
     }
 
     public void receiveWithUdp() {
+        System.out.println("Using protocol: UDP");
+        try {
+            // Open UDP socket
+            DatagramSocket serverSocket = new DatagramSocket(appConfig.getPort());
+            System.out.println(String.format("Waiting at port: %d", serverSocket.getLocalPort()));
+
+            boolean receiving;
+            while (true)
+            {
+                // Receive Chunk Size
+                int receivedFramesCount = 0;
+                byte[] chunkSizeBuffer = new byte[4];
+                DatagramPacket chunkSizePacket = new DatagramPacket(chunkSizeBuffer, chunkSizeBuffer.length);
+                serverSocket.receive(chunkSizePacket);
+                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(chunkSizeBuffer);
+                DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+                int chunkSize = dataInputStream.readInt();
+                appConfig.setChunkSize(32);
+                System.out.println("Received chunk size: " + chunkSize);
+                serverSocket.setSoTimeout(2000);
+
+                // Receive File
+                System.out.println("Starting file transfer...");
+                receiving = true;
+                while(receiving) {
+                    OutputStream localFileOutputStream = new FileOutputStream("test_udp_output.txt");
+                    byte[] message = new byte[chunkSize];
+
+                    try {
+                        // Receive packet and retrieve message
+                        DatagramPacket receivedPacket = new DatagramPacket(message, message.length);
+                        serverSocket.receive(receivedPacket);
+                        message = receivedPacket.getData();
+                        localFileOutputStream.write(message, 0, message.length);
+                        System.out.println(String.format("Received chunk: %d", receivedFramesCount));
+                        receivedFramesCount += 1;
+                    } catch (SocketTimeoutException e){
+                        receiving = false;
+                    }
+                }
+                System.out.println("Transfer complete.");
+
+                //infinite timeout
+                serverSocket.setSoTimeout(0);
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 
     public void receiveWithTcp() {
+        System.out.println("Using protocol: TCP");
+
         try {
             ServerSocket serverSocket = null;
             serverSocket = new ServerSocket(appConfig.getPort());
@@ -75,7 +125,7 @@ public class Server {
         InputStream clientInputStream = clientSocket.getInputStream();
 
         // Open a local output stream, to write the received file
-        OutputStream localFileOutputStream = new FileOutputStream("test_output.txt");
+        OutputStream localFileOutputStream = new FileOutputStream("test_tcp_output.txt");
 
         // Receive chunks
         while ((bytesReceived = clientInputStream.read(buffer)) != -1) {
@@ -106,19 +156,6 @@ public class Server {
             }
         }
         // Close the FileOutputStream handle
-        localFileOutputStream.close();
-    }
-
-    private void receiveWithStreaming(Socket clientSocket) throws IOException {
-        int bytesRead;
-        // File transfer
-        InputStream clientInputStream = clientSocket.getInputStream();
-        OutputStream localFileOutputStream = new FileOutputStream("test_output.txt");
-        byte[] buffer = new byte[appConfig.getChunkSize()];
-        while ((bytesRead = clientInputStream.read(buffer)) != -1) {
-            localFileOutputStream.write(buffer, 0, bytesRead);
-        }
-        // Closing the FileOutputStream handle
         localFileOutputStream.close();
     }
 
