@@ -5,6 +5,7 @@ import utils.cli.CommandLineParser;
 import java.io.*;
 import java.net.*;
 import java.util.Arrays;
+import java.util.Calendar;
 
 public class Client {
     public static int ACK_OK = 100;
@@ -25,11 +26,13 @@ public class Client {
 
     public void run()
     {
+        long startTime = Calendar.getInstance().getTimeInMillis();
         if (appConfig.getUseUDP()) {
             sendWithUdp();
         } else {
             sendWithTcp();
         }
+        System.out.println("Finished with time: " + (Calendar.getInstance().getTimeInMillis() - startTime));
     }
 
 
@@ -149,6 +152,8 @@ public class Client {
         int chunkSize = appConfig.getChunkSize();
         int fileSize = (int)file.length();
         int bufferOffset;
+        long sessionBytesSent = 0;
+        int sessionChunksSent = 0;
         double chunkCount = file.length() / chunkSize + ((file.length() % chunkSize == 0) ? 0 : 1);
 
         // Load file in a buffer
@@ -159,15 +164,16 @@ public class Client {
 
         // Send file chunk by chunk
         OutputStream serverOutputStream = serverSocket.getOutputStream();
+
         for (int chunkIndex = 0; chunkIndex < chunkCount; ++chunkIndex) {
             bufferOffset = chunkIndex * chunkSize;
             if (chunkIndex == chunkCount - 1) {
                 // Last piece might be smaller in size, adjust chunkSize accordingly
-                chunkSize = fileSize - bufferOffset;
+                chunkSize = Math.abs(fileSize - bufferOffset);
             }
 
             // Send chunk
-            System.out.println("Sending chunk: " + chunkIndex);
+//                System.out.println("Sending chunk: " + chunkIndex);
             serverOutputStream.write(fileDataBuffer, bufferOffset, chunkSize);
 
             // -- Stop and Wait implementation --
@@ -175,34 +181,25 @@ public class Client {
                 try {
                     // Check ACK
                     if (receiveInt(serverSocket) == ACK_OK) {
-                        System.out.println(String.format("Received correct ACK for chunk: %d", chunkIndex));
+//                            System.out.println(String.format("Received correct ACK for chunk: %d", chunkIndex));
                     } else {
                         // Received bad ACK message -> resend chunk
-                        System.out.println(String.format("Received malformed ACK for chunk: %d", chunkIndex));
+//                            System.out.println(String.format("Received malformed ACK for chunk: %d", chunkIndex));
                         chunkIndex -= 1;
                     }
                 } catch (SocketTimeoutException e) {
                     // ACK timed out -> resend chunk
-                    System.out.println(String.format("Failed to receive ACK for chunk: %d", chunkIndex));
+//                        System.out.println(String.format("Failed to receive ACK for chunk: %d", chunkIndex));
                     chunkIndex -= 1;
                 }
             }
+            sessionBytesSent += chunkSize;
+            sessionChunksSent += 1;
         }
+        System.out.println(String.format("Session bytes sent: %d", sessionBytesSent));
+        System.out.println(String.format("Session chunks sent: %d", sessionChunksSent));
     }
 
-
-    private void sendWithStreaming(Socket serverSocket, File file) throws IOException {
-        // Read file
-        byte[] fileDataByteArray = new byte[(int) file.length()];
-        FileInputStream fileInputStream = new FileInputStream(file);
-        BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
-        bufferedInputStream.read(fileDataByteArray, 0, fileDataByteArray.length);
-
-        // Stream whole file
-        OutputStream serverOutputStream = serverSocket.getOutputStream();
-        serverOutputStream.write(fileDataByteArray, 0, fileDataByteArray.length);
-        serverOutputStream.flush();
-    }
 
     private void sendInt(Socket serverSocket, int value)
     {

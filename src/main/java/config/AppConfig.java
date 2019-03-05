@@ -9,12 +9,14 @@ public class AppConfig {
     private boolean useUDP;
     private boolean useStreaming;
     private boolean useUrl;
+    private int multiplier;
 
     public AppConfig() {
         useUDP = true;
         useStreaming = false;
         port = 3443;
         chunkSize = 1024;
+        multiplier = 1;
     }
 
     public int getChunkSize() {
@@ -71,5 +73,13 @@ public class AppConfig {
 
     public void setUseUrl(boolean useUrl) {
         this.useUrl = useUrl;
+    }
+
+    public int getMultiplier() {
+        return multiplier;
+    }
+
+    public void setMultiplier(int multiplier) {
+        this.multiplier = multiplier;
     }
 }

@@ -67,7 +67,7 @@ public class Server {
                         serverSocket.receive(receivedPacket);
                         message = receivedPacket.getData();
                         localFileOutputStream.write(message, 0, message.length);
-                        System.out.println(String.format("Received chunk: %d", receivedFramesCount));
+//                        System.out.println(String.format("Received chunk: %d", receivedFramesCount));
                         receivedFramesCount += 1;
                     } catch (SocketTimeoutException e){
                         receiving = false;
@@ -118,7 +118,8 @@ public class Server {
 
     private void handleTransferOverTcp(Socket clientSocket) throws IOException {
         int bytesReceived;
-        int receivedFramesCount = 0;
+        int sessionBytesReceived = 0;
+        int sessionChunksReceived = 0;
         byte[] buffer = new byte[appConfig.getChunkSize()];
 
         // Open the remote socket's input stream
@@ -134,7 +135,8 @@ public class Server {
             {
                 // -- Streaming implementation --
                 localFileOutputStream.write(buffer, 0, bytesReceived);
-                System.out.println(String.format("Received chunk: %d", receivedFramesCount));
+//                System.out.println(String.format("Received chunk: %d", sessionChunksReceived));
+
             }
             else
             {
@@ -146,15 +148,18 @@ public class Server {
                 } else {
                     // Write received chunk to file
                     localFileOutputStream.write(buffer, 0, bytesReceived);
-                    System.out.println(String.format("Received chunk: %d", receivedFramesCount));
+//                    System.out.println(String.format("Received chunk: %d", sessionChunksReceived));
 
                     // Reply with ACK message
                     sendInt(clientSocket, Client.ACK_OK);
-                    System.out.println(String.format("Sent ACK for chunk: %d", receivedFramesCount));
+//                    System.out.println(String.format("Sent ACK for chunk: %d", sessionChunksReceived));
                 }
-                receivedFramesCount += 1;
             }
+            sessionBytesReceived += bytesReceived;
+            sessionChunksReceived += 1;
         }
+        System.out.println(String.format("Session bytes received: %d", sessionBytesReceived));
+        System.out.println(String.format("Session chunks received: %d", sessionChunksReceived));
         // Close the FileOutputStream handle
         localFileOutputStream.close();
     }

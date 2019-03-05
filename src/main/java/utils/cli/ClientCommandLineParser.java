@@ -35,6 +35,12 @@ public class ClientCommandLineParser implements CommandLineParser {
         stopAndWait.setRequired(false);
         options.addOption(stopAndWait);
 
+        Option multiplier = new Option("m", "multiplier", true,  "Multiply the number of transfers, to simulate large file transfers.");
+        multiplier.setRequired(false);
+        options.addOption(multiplier);
+
+
+
         org.apache.commons.cli.CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
 
@@ -56,6 +62,12 @@ public class ClientCommandLineParser implements CommandLineParser {
             }
             if(cmd.hasOption("url")) {
                 config.setUseUrl(true);
+            }
+            if(cmd.hasOption("url")) {
+                config.setUseUrl(true);
+            }
+            if(cmd.hasOption("m")) {
+                config.setMultiplier(Integer.parseInt(cmd.getOptionValue("m")));
             }
         }
         catch (ParseException exception) {
