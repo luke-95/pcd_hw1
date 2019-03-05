@@ -69,6 +69,15 @@ public class Server {
                         localFileOutputStream.write(message, 0, message.length);
 //                        System.out.println(String.format("Received chunk: %d", receivedFramesCount));
                         receivedFramesCount += 1;
+
+                        // Send ACK for stop and wait
+                        if (!appConfig.getUseStreaming())
+                        {
+                            InetAddress address = receivedPacket.getAddress();
+                            String messageString = "ACK";
+                            DatagramPacket chunkPacket = new DatagramPacket(messageString.getBytes(), messageString.getBytes().length, address, appConfig.getPort());
+                            serverSocket.send(chunkPacket);
+                        }
                     } catch (SocketTimeoutException e){
                         receiving = false;
                     }
@@ -143,7 +152,7 @@ public class Server {
                 // -- Stop and Wait implementation --
                 // Random for a 1 in 100 chance to "miss" (ignore) a reply.
                 int randomNum = ThreadLocalRandom.current().nextInt(1, 100 + 1);
-                if (randomNum == 50) {
+                if (false) {
                     // Ignore the received chunk
                 } else {
                     // Write received chunk to file

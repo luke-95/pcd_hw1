@@ -27,6 +27,8 @@ public class Client {
     public void run()
     {
         long startTime = Calendar.getInstance().getTimeInMillis();
+        long startTimeNano = System.nanoTime();
+
         if (appConfig.getUseUDP()) {
             sendWithUdp();
         } else {
@@ -91,16 +93,26 @@ public class Client {
                 DatagramPacket chunkPacket = new DatagramPacket(message, message.length, address, appConfig.getPort());
                 serverSocket.send(chunkPacket);
 
-//                // Get ACK
-//                try {
-//                    byte[] ackBuffer = new byte[chunkSize];
-//                    DatagramPacket ackPacket = new DatagramPacket(ackBuffer, ackBuffer.length);
-//                    serverSocket.receive(ackPacket);
-//                }
-//                catch (SocketTimeoutException e) {
-//                    // ACK timed out
-//                    chunkIndex -= 1;
-//                }
+                // Get ACK if Stop and Wait
+                if (!appConfig.getUseStreaming())
+                {
+                    try {
+                        byte[] ackBuffer = new byte[chunkSize];
+                        DatagramPacket ackPacket = new DatagramPacket(ackBuffer, ackBuffer.length);
+                        serverSocket.receive(ackPacket);
+
+                        String ack = new String(ackBuffer, ackBuffer.length);
+                        if (!ack.equals("ACK"))
+                        {
+                            // Malformed ACK
+                            chunkIndex -= 1;
+                        }
+                    }
+                    catch (SocketTimeoutException e) {
+                        // ACK timed out
+                        chunkIndex -= 1;
+                    }
+                }
             }
             System.out.println("File transfer complete.");
 
